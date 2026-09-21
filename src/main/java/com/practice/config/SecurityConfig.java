@@ -24,13 +24,11 @@ public class SecurityConfig {
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter
     ) {
-        this.jwtAuthenticationFilter =
-                jwtAuthenticationFilter;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-
         return new BCryptPasswordEncoder();
     }
 
@@ -54,36 +52,48 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
+                        // Public root endpoint
+                        .requestMatchers(
+                                "/"
+                        ).permitAll()
+
+                        // Allow CORS preflight requests
                         .requestMatchers(
                                 HttpMethod.OPTIONS,
                                 "/**"
                         ).permitAll()
 
+                        // User registration and login
                         .requestMatchers(
                                 "/api/users/register",
                                 "/api/users/login"
                         ).permitAll()
 
+                        // Public services
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/services/**"
                         ).permitAll()
 
+                        // Public providers
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/providers/**"
                         ).permitAll()
 
+                        // Public provider reviews
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/reviews/provider/**"
                         ).permitAll()
 
+                        // Admin creates providers
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/providers"
                         ).hasRole("ADMIN")
 
+                        // Customer/Admin creates bookings
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/bookings"
@@ -92,6 +102,7 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
+                        // Customer/Admin sees own bookings
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/bookings/my-bookings"
@@ -100,16 +111,19 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
+                        // Admin sees all bookings
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/bookings"
                         ).hasRole("ADMIN")
 
+                        // Admin assigns provider
                         .requestMatchers(
                                 HttpMethod.PUT,
                                 "/api/bookings/*/assign/*"
                         ).hasRole("ADMIN")
 
+                        // Provider/Admin sees provider bookings
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/bookings/provider/**"
@@ -118,6 +132,7 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
+                        // Provider/Admin updates booking status
                         .requestMatchers(
                                 HttpMethod.PUT,
                                 "/api/bookings/*/status"
@@ -126,6 +141,7 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
+                        // Customer/Admin cancels booking
                         .requestMatchers(
                                 HttpMethod.PUT,
                                 "/api/bookings/*/cancel"
@@ -134,6 +150,7 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
+                        // Customer/Admin creates review
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/reviews/booking/**"
@@ -142,6 +159,7 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
+                        // Customer/Admin sees own reviews
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/reviews/my-reviews"
@@ -150,11 +168,13 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
+                        // Authenticated users can see booking reviews
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/reviews/booking/**"
                         ).authenticated()
 
+                        // Everything else requires authentication
                         .anyRequest().authenticated()
                 )
 
