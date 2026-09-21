@@ -30,9 +30,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
-        String authorizationHeader =
-                request.getHeader("Authorization");
+        String authorizationHeader = request.getHeader("Authorization");
 
+        // No JWT -> continue normally.
+        // Public endpoints can therefore work without authentication.
         if (authorizationHeader == null ||
                 !authorizationHeader.startsWith("Bearer ")) {
 
@@ -40,32 +41,42 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String token =
-                authorizationHeader.substring(7);
+        String token = authorizationHeader.substring(7).trim();
 
-        if (jwtService.isTokenValid(token)) {
+        if (token.isEmpty()) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-            String email =
-                    jwtService.extractEmail(token);
+        try {
 
-            String role =
-                    jwtService.extractRole(token);
+            if (jwtService.isTokenValid(token)) {
 
-            SimpleGrantedAuthority authority =
-                    new SimpleGrantedAuthority(
-                            "ROLE_" + role
-                    );
+                String email = jwtService.extractEmail(token);
+                String role = jwtService.extractRole(token);
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            email,
-                            null,
-                            Collections.singletonList(authority)
-                    );
+                if (email != null && role != null) {
 
-            SecurityContextHolder
-                    .getContext()
-                    .setAuthentication(authentication);
+                    SimpleGrantedAuthority authority =
+                            new SimpleGrantedAuthority("ROLE_" + role);
+
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    email,
+                                    null,
+                                    Collections.singletonList(authority)
+                            );
+
+                    SecurityContextHolder
+                            .getContext()
+                            .setAuthentication(authentication);
+                }
+            }
+
+        } catch (Exception e) {
+
+            // Invalid JWT should not crash the application.
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
