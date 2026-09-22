@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import com.practice.entity.User;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
@@ -24,11 +25,15 @@ public class JwtService {
             @Value("${jwt.expiration}") long expiration) {
 
         this.secretKey = Keys.hmacShaKeyFor(
-                java.util.Base64.getDecoder().decode(secret)
+                secret.getBytes(StandardCharsets.UTF_8)
         );
 
         this.expiration = expiration;
     }
+
+    // =========================================================
+    // GENERATE TOKEN
+    // =========================================================
 
     public String generateToken(User user) {
 
@@ -47,41 +52,59 @@ public class JwtService {
                 .compact();
     }
 
-    public String extractEmail(String token) {
+    // =========================================================
+    // GET CLAIMS
+    // =========================================================
+
+    private Claims getClaims(String token) {
 
         return Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+                .getPayload();
     }
+
+    // =========================================================
+    // EXTRACT EMAIL
+    // =========================================================
+
+    public String extractEmail(String token) {
+
+        return getClaims(token).getSubject();
+    }
+
+    // =========================================================
+    // EXTRACT ROLE
+    // =========================================================
 
     public String extractRole(String token) {
 
-        Object role =
-                Jwts.parser()
-                        .verifyWith(secretKey)
-                        .build()
-                        .parseSignedClaims(token)
-                        .getPayload()
-                        .get("role");
+        String role = getClaims(token)
+                .get("role", String.class);
 
-        return role != null
-                ? role.toString()
-                : "CUSTOMER";
+        if (role == null) {
+            return "CUSTOMER";
+        }
+
+        return role;
     }
+
+    // =========================================================
+    // VALIDATE TOKEN
+    // =========================================================
 
     public boolean isTokenValid(String token) {
 
         try {
 
-            Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token);
+            Claims claims = getClaims(token);
 
-            return true;
+            Date expirationDate =
+                    claims.getExpiration();
+
+            return expirationDate != null
+                    && expirationDate.after(new Date());
 
         } catch (Exception e) {
 

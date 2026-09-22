@@ -1,16 +1,19 @@
 package com.practice.config;
 
-import com.practice.security.JwtAuthenticationFilter;
+import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import com.practice.security.JwtAuthenticationFilter;
 
 @Configuration
 public class SecurityConfig {
@@ -18,216 +21,261 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     public SecurityConfig(
-            JwtAuthenticationFilter jwtAuthenticationFilter
-    ) {
+            JwtAuthenticationFilter jwtAuthenticationFilter) {
+
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
+    // =========================================================
+    // CORS
+    // =========================================================
+
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public CorsConfigurationSource corsConfigurationSource() {
+
+        CorsConfiguration configuration =
+                new CorsConfiguration();
+
+        configuration.setAllowedOriginPatterns(
+                List.of(
+                        "https://*.vercel.app",
+                        "http://localhost:5173",
+                        "http://localhost:5174",
+                        "http://localhost:3000"
+                )
+        );
+
+        configuration.setAllowedMethods(
+                List.of(
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "PATCH",
+                        "OPTIONS"
+                )
+        );
+
+        configuration.setAllowedHeaders(
+                List.of("*")
+        );
+
+        configuration.setExposedHeaders(
+                List.of("Authorization")
+        );
+
+        // JWT is sent in Authorization header.
+        configuration.setAllowCredentials(false);
+
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+
+        source.registerCorsConfiguration(
+                "/**",
+                configuration
+        );
+
+        return source;
     }
+
+    // =========================================================
+    // SECURITY FILTER CHAIN
+    // =========================================================
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http
-    ) throws Exception {
+            HttpSecurity http) throws Exception {
 
         http
 
-            // =========================================
-            // CSRF
-            // =========================================
+            // Disable CSRF because this is a JWT REST API
             .csrf(csrf -> csrf.disable())
 
-            // =========================================
-            // CORS
-            // =========================================
-            .cors(cors -> {})
-
-            // =========================================
-            // STATELESS JWT AUTHENTICATION
-            // =========================================
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(
-                    SessionCreationPolicy.STATELESS
-                )
+            // Enable CORS
+            .cors(cors ->
+                    cors.configurationSource(
+                            corsConfigurationSource()
+                    )
             )
 
-            // =========================================
+            // JWT = stateless
+            .sessionManagement(session ->
+                    session.sessionCreationPolicy(
+                            SessionCreationPolicy.STATELESS
+                    )
+            )
+
+            // =================================================
             // AUTHORIZATION
-            // =========================================
-            .authorizeHttpRequests(auth -> {
+            // =================================================
 
-                // =========================================
-                // PUBLIC ROOT
-                // =========================================
-                auth.requestMatchers(
-                    "/",
-                    "/error"
-                ).permitAll();
+            .authorizeHttpRequests(auth -> auth
 
-                // =========================================
-                // CORS PREFLIGHT
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.OPTIONS,
-                    "/**"
-                ).permitAll();
+                // CORS preflight
+                .requestMatchers(
+                        HttpMethod.OPTIONS,
+                        "/**"
+                ).permitAll()
 
-                // =========================================
-                // USER REGISTER + LOGIN
-                // =========================================
-                auth.requestMatchers(
-                    "/api/users/register",
-                    "/api/users/login"
-                ).permitAll();
+                // Root / error
+                .requestMatchers(
+                        "/",
+                        "/error"
+                ).permitAll()
 
-                // =========================================
-                // PUBLIC SERVICES
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.GET,
-                    "/api/services/**"
-                ).permitAll();
+                // =================================================
+                // LOGIN / REGISTER
+                // =================================================
 
-                // =========================================
-                // PUBLIC PROVIDERS
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.GET,
-                    "/api/providers/**"
-                ).permitAll();
+                .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/users/register",
+                        "/api/users/login"
+                ).permitAll()
 
-                // =========================================
-                // PUBLIC PROVIDER REVIEWS
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.GET,
-                    "/api/reviews/provider/**"
-                ).permitAll();
+                // =================================================
+                // SERVICES - PUBLIC GET
+                // =================================================
 
-                // =========================================
-                // ADMIN - CREATE PROVIDER
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.POST,
-                    "/api/providers"
-                ).hasRole("ADMIN");
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/services",
+                        "/api/services/**"
+                ).permitAll()
 
-                // =========================================
-                // CUSTOMER / ADMIN - CREATE BOOKING
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.POST,
-                    "/api/bookings"
+                // =================================================
+                // PROVIDERS - PUBLIC GET
+                // =================================================
+
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/providers",
+                        "/api/providers/**"
+                ).permitAll()
+
+                // =================================================
+                // REVIEWS - PUBLIC GET
+                // =================================================
+
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/reviews/provider/**"
+                ).permitAll()
+
+                // =================================================
+                // CREATE PROVIDER - ADMIN
+                // =================================================
+
+                .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/providers"
+                ).hasRole("ADMIN")
+
+                // =================================================
+                // BOOKINGS
+                // =================================================
+
+                // Customer / Admin can create booking
+                .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/bookings"
                 ).hasAnyRole(
-                    "CUSTOMER",
-                    "ADMIN"
-                );
+                        "CUSTOMER",
+                        "ADMIN"
+                )
 
-                // =========================================
-                // CUSTOMER / ADMIN - MY BOOKINGS
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.GET,
-                    "/api/bookings/my-bookings"
+                // Customer / Admin can see own bookings
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/bookings/my-bookings"
                 ).hasAnyRole(
-                    "CUSTOMER",
-                    "ADMIN"
-                );
+                        "CUSTOMER",
+                        "ADMIN"
+                )
 
-                // =========================================
-                // ADMIN - ALL BOOKINGS
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.GET,
-                    "/api/bookings"
-                ).hasRole("ADMIN");
+                // Only Admin can see all bookings
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/bookings"
+                ).hasRole("ADMIN")
 
-                // =========================================
-                // ADMIN - ASSIGN PROVIDER
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.PUT,
-                    "/api/bookings/*/assign/*"
-                ).hasRole("ADMIN");
+                // Admin assigns provider
+                .requestMatchers(
+                        HttpMethod.PUT,
+                        "/api/bookings/*/assign/*"
+                ).hasRole("ADMIN")
 
-                // =========================================
-                // PROVIDER / ADMIN - PROVIDER BOOKINGS
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.GET,
-                    "/api/bookings/provider/**"
+                // Provider / Admin can see provider bookings
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/bookings/provider/**"
                 ).hasAnyRole(
-                    "PROVIDER",
-                    "ADMIN"
-                );
+                        "PROVIDER",
+                        "ADMIN"
+                )
 
-                // =========================================
-                // PROVIDER / ADMIN - UPDATE STATUS
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.PUT,
-                    "/api/bookings/*/status"
+                // Provider / Admin can update booking status
+                .requestMatchers(
+                        HttpMethod.PUT,
+                        "/api/bookings/*/status"
                 ).hasAnyRole(
-                    "PROVIDER",
-                    "ADMIN"
-                );
+                        "PROVIDER",
+                        "ADMIN"
+                )
 
-                // =========================================
-                // CUSTOMER / ADMIN - CANCEL BOOKING
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.PUT,
-                    "/api/bookings/*/cancel"
+                // Customer / Admin can cancel booking
+                .requestMatchers(
+                        HttpMethod.PUT,
+                        "/api/bookings/*/cancel"
                 ).hasAnyRole(
-                    "CUSTOMER",
-                    "ADMIN"
-                );
+                        "CUSTOMER",
+                        "ADMIN"
+                )
 
-                // =========================================
-                // CUSTOMER / ADMIN - CREATE REVIEW
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.POST,
-                    "/api/reviews/booking/**"
+                // =================================================
+                // REVIEWS
+                // =================================================
+
+                // Customer / Admin can create review
+                .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/reviews/booking/**"
                 ).hasAnyRole(
-                    "CUSTOMER",
-                    "ADMIN"
-                );
+                        "CUSTOMER",
+                        "ADMIN"
+                )
 
-                // =========================================
-                // CUSTOMER / ADMIN - MY REVIEWS
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.GET,
-                    "/api/reviews/my-reviews"
+                // Customer / Admin can see own reviews
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/reviews/my-reviews"
                 ).hasAnyRole(
-                    "CUSTOMER",
-                    "ADMIN"
-                );
+                        "CUSTOMER",
+                        "ADMIN"
+                )
 
-                // =========================================
-                // AUTHENTICATED - BOOKING REVIEWS
-                // =========================================
-                auth.requestMatchers(
-                    HttpMethod.GET,
-                    "/api/reviews/booking/**"
-                ).authenticated();
+                // Authenticated users can see booking reviews
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/reviews/booking/**"
+                ).authenticated()
 
-                // =========================================
+                // =================================================
                 // EVERYTHING ELSE
-                // =========================================
-                auth.anyRequest().authenticated();
-            })
+                // =================================================
 
-            // =========================================
+                .anyRequest().authenticated()
+            )
+
+            // =================================================
             // JWT FILTER
-            // =========================================
+            // =================================================
+
             .addFilterBefore(
-                jwtAuthenticationFilter,
-                UsernamePasswordAuthenticationFilter.class
+                    jwtAuthenticationFilter,
+                    UsernamePasswordAuthenticationFilter.class
             );
 
         return http.build();

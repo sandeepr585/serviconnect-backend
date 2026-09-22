@@ -2,7 +2,6 @@ package com.practice.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,12 +16,6 @@ import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(
-    origins = {
-        "http://localhost:5173",
-        "http://localhost:5174"
-    }
-)
 public class UserController {
 
     private final UserService userService;
@@ -45,7 +38,7 @@ public class UserController {
             User savedUser =
                     userService.registerUser(user);
 
-            // Never send password back to frontend
+            // Never send password to frontend
             savedUser.setPassword(null);
 
             return ResponseEntity
@@ -77,21 +70,13 @@ public class UserController {
                     .body("Invalid email or password");
         }
 
-        /*
-         * Generate JWT using the complete user.
-         *
-         * JwtService now puts both:
-         * email
-         * role
-         *
-         * into the JWT.
-         */
+        // Generate JWT
         String token =
                 jwtService.generateToken(
                         loggedInUser
                 );
 
-        // Never send password back to frontend
+        // Never send password to frontend
         loggedInUser.setPassword(null);
 
         return ResponseEntity.ok(
@@ -109,8 +94,8 @@ public class UserController {
         String authorizationHeader =
                 request.getHeader("Authorization");
 
-        if (authorizationHeader == null ||
-                !authorizationHeader.startsWith("Bearer ")) {
+        if (authorizationHeader == null
+                || !authorizationHeader.startsWith("Bearer ")) {
 
             return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED)
@@ -120,10 +105,6 @@ public class UserController {
         String token =
                 authorizationHeader.substring(7);
 
-        /*
-         * Check whether token is valid before
-         * extracting information from it.
-         */
         if (!jwtService.isTokenValid(token)) {
 
             return ResponseEntity
@@ -144,17 +125,12 @@ public class UserController {
                     .body("User not found");
         }
 
-        // Never send password back to frontend
+        // Never send password
         user.setPassword(null);
 
         return ResponseEntity.ok(user);
     }
 
-    /*
-     * LoginResponse is already inside UserController.
-     *
-     * We do NOT need a separate LoginResponse.java file.
-     */
     public static class LoginResponse {
 
         private String token;
@@ -169,12 +145,10 @@ public class UserController {
         }
 
         public String getToken() {
-
             return token;
         }
 
         public User getUser() {
-
             return user;
         }
     }

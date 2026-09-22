@@ -1,11 +1,12 @@
 package com.practice.service;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 
 import com.practice.entity.User;
 import com.practice.repository.UserRepository;
 
-@org.springframework.stereotype.Service
+@Service
 public class UserService {
 
     private final UserRepository userRepository;
@@ -19,6 +20,10 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    // =========================================================
+    // REGISTER USER
+    // =========================================================
+
     public User registerUser(User user) {
 
         if (userRepository.existsByEmail(user.getEmail())) {
@@ -28,9 +33,18 @@ public class UserService {
             );
         }
 
-        // Every newly registered account is a CUSTOMER
+        if (user.getPassword() == null ||
+                user.getPassword().isBlank()) {
+
+            throw new RuntimeException(
+                    "Password is required"
+            );
+        }
+
+        // Every new user is CUSTOMER
         user.setRole("CUSTOMER");
 
+        // Encrypt password
         user.setPassword(
                 passwordEncoder.encode(
                         user.getPassword()
@@ -40,15 +54,21 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    // =========================================================
+    // LOGIN USER
+    // =========================================================
+
     public User loginUser(
             String email,
             String password) {
 
-        User user =
-                userRepository.findByEmail(email)
-                        .orElse(null);
+        User user = userRepository.findByEmail(email);
 
         if (user == null) {
+            return null;
+        }
+
+        if (user.getPassword() == null) {
             return null;
         }
 
@@ -62,10 +82,47 @@ public class UserService {
         return user;
     }
 
+    // =========================================================
+    // GET USER BY EMAIL
+    // =========================================================
+
     public User getUserByEmail(String email) {
 
+        return userRepository.findByEmail(email);
+    }
+
+    // =========================================================
+    // GET USER BY ID
+    // =========================================================
+
+    public User getUserById(Long id) {
+
         return userRepository
-                .findByEmail(email)
+                .findById(id)
                 .orElse(null);
+    }
+
+    // =========================================================
+    // SAVE USER
+    // =========================================================
+
+    public User saveUser(User user) {
+
+        return userRepository.save(user);
+    }
+
+    // =========================================================
+    // DELETE USER
+    // =========================================================
+
+    public boolean deleteUser(Long id) {
+
+        if (!userRepository.existsById(id)) {
+            return false;
+        }
+
+        userRepository.deleteById(id);
+
+        return true;
     }
 }
